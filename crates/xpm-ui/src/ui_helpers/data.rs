@@ -161,7 +161,7 @@ pub async fn load_packages_async(tx: &std::sync::mpsc::Sender<UiMessage>, check_
         .map(|p| {
             let has_update = flatpak_update_names.contains(&p.name);
             // Try case-insensitive lookup
-            let (raw_display_name, summary) = flatpak_name_map
+            let (display_name, summary) = flatpak_name_map
                 .get(&p.name.to_lowercase())
                 .cloned()
                 .unwrap_or_else(|| {
@@ -189,8 +189,6 @@ pub async fn load_packages_async(tx: &std::sync::mpsc::Sender<UiMessage>, check_
 
                     (titled_name, String::new())
                 });
-
-            let display_name = format!("{} (Flatpak)", raw_display_name);
 
             PackageData {
                 name: SharedString::from(p.name.as_str()),
@@ -276,7 +274,6 @@ pub async fn search_packages_async(tx: &std::sync::mpsc::Sender<UiMessage>, quer
         .iter()
         .map(|r| {
             let display_name = humanize_package_name(&r.name, &desktop_map);
-            let display_name = format!("{} (Pacman)", display_name);
 
             PackageData {
                 name: SharedString::from(r.name.as_str()),
@@ -319,11 +316,9 @@ pub async fn search_packages_async(tx: &std::sync::mpsc::Sender<UiMessage>, quer
             .collect::<Vec<String>>()
             .join(" ");
 
-        let display_name = format!("{} (Flatpak)", titled_name);
-
         PackageData {
             name: SharedString::from(r.name.as_str()),
-            display_name: SharedString::from(display_name),
+            display_name: SharedString::from(titled_name),
             version: SharedString::from(r.version.to_string().as_str()),
             description: SharedString::from(r.description.as_str()),
             repository: SharedString::from(r.repository.as_str()),
@@ -1227,7 +1222,6 @@ fn package_to_ui(
     desktop_map: &HashMap<String, String>,
 ) -> PackageData {
     let display_name = humanize_package_name(&package.name, desktop_map);
-    let display_name = format!("{} (Pacman)", display_name);
 
     PackageData {
         name: SharedString::from(package.name.as_str()),
@@ -1253,7 +1247,6 @@ fn package_to_ui(
 
 fn update_to_ui(update: &UpdateInfo, desktop_map: &HashMap<String, String>) -> PackageData {
     let display_name = humanize_package_name(&update.name, desktop_map);
-    let display_name = format!("{} (Pacman)", display_name);
 
     PackageData {
         name: SharedString::from(update.name.as_str()),
