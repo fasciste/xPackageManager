@@ -137,23 +137,26 @@ component PackageRow inherits Rectangle {
             alignment: center;
 
             HorizontalLayout {
-                spacing: 8px;
+                spacing: 5px;
                 Text {
                     text: pkg.display-name;
                     font-size: 14px;
                     font-weight: 500;
                     color: pkg.has-update ? #9b59b6 : Palette.foreground;
                     overflow: elide;
-                    vertical-alignment: bottom;
+                    vertical-alignment: center;
                 }
 
                 Text {
                     text: pkg.backend == 1 ? "Flatpak" : "Pacman";
-                    font-size: 11px;
+                    font-size: 10px;
                     color: Palette.foreground;
                     opacity: 0.5;
-                    vertical-alignment: bottom;
+                    vertical-alignment: center;
+                    y: 1px; // Slight optical adjustment
                 }
+                
+                Rectangle { horizontal-stretch: 1; }
             }
 
             Text {
