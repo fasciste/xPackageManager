@@ -1,23 +1,3 @@
-
-fn matches(&self, package: &Package) -> bool {
-    if !self.search_text.is_empty() {
-        let search = self.search_text.to_lowercase();
-        if !package.name.to_lowercase().contains(&search)
-            && !package.description.to_lowercase().contains(&search)
-        {
-            return false;
-        }
-    }
-
-    if let Some(backend) = self.backend {
-        if package.backend != backend {
-            return false;
-        }
-    }
-
-    true
-}
-
 /// Application state management.
 use xpm_core::{
     operation::OperationResult,
@@ -53,6 +33,27 @@ pub struct FilterOptions {
     pub explicit_only: bool,
     /// Show only packages with updates.
     pub updates_only: bool,
+}
+
+impl FilterOptions {
+    fn matches(&self, package: &Package) -> bool {
+        if !self.search_text.is_empty() {
+            let search = self.search_text.to_lowercase();
+            if !package.name.to_lowercase().contains(&search)
+                && !package.description.to_lowercase().contains(&search)
+            {
+                return false;
+            }
+        }
+
+        if let Some(backend) = self.backend {
+            if package.backend != backend {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 /// Application state.
