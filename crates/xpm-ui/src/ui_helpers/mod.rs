@@ -5,7 +5,7 @@ pub mod runtime;
 pub mod types;
 pub mod utils;
 
-pub use backends::{init_backends, UiBackends};
+pub use backends::init_backends;
 pub use data::{
     humanize_package_name, load_category_packages, load_packages_async, load_repo_packages,
     search_packages_async,

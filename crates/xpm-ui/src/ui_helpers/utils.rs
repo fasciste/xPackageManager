@@ -105,7 +105,7 @@ pub fn format_size(bytes: u64) -> String {
 /// Handles CSI sequences (ESC[...), OSC (ESC]...), and simple ESC+char sequences.
 /// Normalizes PTY line endings (\r\n → \n). Bare \r (progress bars) is preserved.
 pub fn strip_ansi(input: &str) -> String {
-    let mut result = String::with_capacity(input.len());
+    let mut result = Vec::with_capacity(input.len());
     let bytes = input.as_bytes();
     let len = bytes.len();
     let mut i = 0;
@@ -156,14 +156,14 @@ pub fn strip_ansi(input: &str) -> String {
             }
         } else if bytes[i] == b'\r' && i + 1 < len && bytes[i + 1] == b'\n' {
             // \r\n is a PTY line ending — emit just \n
-            result.push('\n');
+            result.push(b'\n');
             i += 2;
         } else {
-            result.push(bytes[i] as char);
+            result.push(bytes[i]);
             i += 1;
         }
     }
-    result
+    String::from_utf8_lossy(&result).into_owned()
 }
 
 /// Simulate terminal carriage-return behavior on a text buffer.

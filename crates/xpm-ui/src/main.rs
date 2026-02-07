@@ -8,7 +8,7 @@ use std::os::unix::process::CommandExt;
 use std::rc::Rc;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use tracing::{error, info, Level};
+use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 slint::include_modules!();
@@ -41,9 +41,6 @@ const PACMAN_USER_PROMPT_PATTERNS: &[&str] = &[
     "enter a selection",
     "replace",
 ];
-
-const TERMINAL_RESET: &str = "\x1b[0m";
-const TERMINAL_BOLD: &str = "\x1b[1m";
 
 /// Spawn a child process in a PTY, returning (master_fd, child_pid)
 fn spawn_in_pty(cmd: &str, args: &[&str]) -> Result<(i32, u32), String> {
@@ -319,14 +316,20 @@ fn run_managed_operation(
                             if trimmed.is_empty() {
                                 continue;
                             }
-                            // Skip raw progress bar fragments (e.g. "####..." or repeated dots)
-                            if trimmed.len() > 5
-                                && (trimmed.chars().filter(|&c| c == '#').count()
-                                    > trimmed.len() / 2
-                                    || trimmed.chars().filter(|&c| c == '.').count()
-                                        > trimmed.len() / 2)
-                            {
-                                continue;
+                            // Skip raw progress bar fragments
+                            if trimmed.len() > 5 {
+                                let total_chars = trimmed.chars().count();
+                                let noise_chars = trimmed.chars().filter(|&c| {
+                                    c == '#' || c == '.' || c == '=' || c == '-' ||
+                                    // Block characters (U+2580 to U+259F)
+                                    ('\u{2580}'..='\u{259F}').contains(&c) ||
+                                    // Geometric shapes (e.g. circles, squares)
+                                    ('\u{25A0}'..='\u{25FF}').contains(&c)
+                                }).count();
+
+                                if noise_chars > total_chars / 2 {
+                                    continue;
+                                }
                             }
                             pending_output.push_str(trimmed);
                             pending_output.push('\n');
@@ -541,73 +544,6 @@ fn parse_progress_fraction(
         }
     }
     None
-}
-
-/// Convert a Package to PackageData for the UI
-fn package_to_ui(
-    pkg: &xpm_core::package::Package,
-    has_update: bool,
-    desktop_map: &HashMap<String, String>,
-) -> PackageData {
-    let backend = match pkg.backend {
-        xpm_core::package::PackageBackend::Pacman => 0,
-        xpm_core::package::PackageBackend::Flatpak => 1,
-    };
-
-    let display_name = humanize_package_name(&pkg.name, desktop_map);
-
-    PackageData {
-        name: SharedString::from(pkg.name.as_str()),
-        display_name: SharedString::from(&display_name),
-        version: SharedString::from(pkg.version.to_string().as_str()),
-        description: SharedString::from(pkg.description.as_str()),
-        repository: SharedString::from(pkg.repository.as_str()),
-        backend,
-        installed: matches!(
-            pkg.status,
-            xpm_core::package::PackageStatus::Installed | xpm_core::package::PackageStatus::Orphan
-        ),
-        has_update,
-        installed_size: SharedString::from(""),
-        licenses: SharedString::from(""),
-        url: SharedString::from(""),
-        dependencies: SharedString::from(""),
-        required_by: SharedString::from(""),
-        icon_name: SharedString::from(""),
-        selected: false,
-    }
-}
-
-/// Convert UpdateInfo to PackageData for the UI
-fn update_to_ui(update: &xpm_core::package::UpdateInfo) -> PackageData {
-    let backend = match update.backend {
-        xpm_core::package::PackageBackend::Pacman => 0,
-        xpm_core::package::PackageBackend::Flatpak => 1,
-    };
-
-    let version_str = format!(
-        "{} → {}",
-        update.current_version.to_string(),
-        update.new_version.to_string()
-    );
-
-    PackageData {
-        name: SharedString::from(update.name.as_str()),
-        display_name: SharedString::from(update.name.as_str()),
-        version: SharedString::from(version_str.as_str()),
-        description: SharedString::from(version_str.as_str()),
-        repository: SharedString::from(update.repository.as_str()),
-        backend,
-        installed: true,
-        has_update: true,
-        installed_size: SharedString::from(format_size(update.download_size).as_str()),
-        licenses: SharedString::from(""),
-        url: SharedString::from(""),
-        dependencies: SharedString::from(""),
-        required_by: SharedString::from(""),
-        icon_name: SharedString::from(""),
-        selected: false,
-    }
 }
 
 /// Helper to update the `selected` field in a VecModel

@@ -3,10 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use serde_json::Value;
-use xpm_alpm::AlpmBackend;
 use xpm_core::package::{PackageBackend, PackageStatus, UpdateInfo, Version};
 use xpm_core::source::PackageSource;
-use xpm_flatpak::FlatpakBackend;
 
 use super::types::UiMessage;
 use crate::{PackageData, StatsData};
