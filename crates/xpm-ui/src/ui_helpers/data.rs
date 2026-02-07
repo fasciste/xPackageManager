@@ -268,6 +268,7 @@ pub async fn search_packages_async(tx: &std::sync::mpsc::Sender<UiMessage>, quer
 
     // Build desktop name map for humanization
     let desktop_map = build_desktop_name_map();
+    let flatpak_name_map = build_flatpak_name_map();
 
     // Convert to UI types
     let mut results: Vec<PackageData> = pacman_results
@@ -296,31 +297,47 @@ pub async fn search_packages_async(tx: &std::sync::mpsc::Sender<UiMessage>, quer
         .collect();
 
     results.extend(flatpak_results.iter().map(|r| {
-        let fallback_name = r.name
-            .split('.')
-            .last()
-            .unwrap_or(&r.name)
-            .replace('_', " ")
-            .replace('-', " ");
-            
-        // Title case the fallback name
-        let titled_name: String = fallback_name
-            .split_whitespace()
-            .map(|s| {
-                let mut c = s.chars();
-                match c.next() {
-                    None => String::new(),
-                    Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-                }
-            })
-            .collect::<Vec<String>>()
-            .join(" ");
+        // Try case-insensitive lookup from AppStream data
+        let (display_name, summary) = flatpak_name_map
+            .get(&r.name.to_lowercase())
+            .cloned()
+            .unwrap_or_else(|| {
+                // Fallback: extract readable name from app ID
+                let fallback_name = r.name
+                    .split('.')
+                    .last()
+                    .unwrap_or(&r.name)
+                    .replace('_', " ")
+                    .replace('-', " ");
+                    
+                // Title case the fallback name
+                let titled_name: String = fallback_name
+                    .split_whitespace()
+                    .map(|s| {
+                        let mut c = s.chars();
+                        match c.next() {
+                            None => String::new(),
+                            Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                        }
+                    })
+                    .collect::<Vec<String>>()
+                    .join(" ");
+                
+                (titled_name, String::new())
+            });
+
+        // Use AppStream summary if available, otherwise fallback to search result description
+        let final_description = if !summary.is_empty() {
+            summary
+        } else {
+            r.description.clone()
+        };
 
         PackageData {
             name: SharedString::from(r.name.as_str()),
-            display_name: SharedString::from(titled_name),
+            display_name: SharedString::from(display_name),
             version: SharedString::from(r.version.to_string().as_str()),
-            description: SharedString::from(r.description.as_str()),
+            description: SharedString::from(final_description.as_str()),
             repository: SharedString::from(r.repository.as_str()),
             backend: 1,
             installed: r.installed,
