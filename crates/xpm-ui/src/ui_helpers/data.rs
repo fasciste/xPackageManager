@@ -151,14 +151,17 @@ pub async fn load_packages_async(tx: &std::sync::mpsc::Sender<UiMessage>, check_
         .map(|p| package_to_ui(p, update_names.contains(&p.name), &desktop_map))
         .collect();
 
-    let updates_ui: Vec<PackageData> = updates.iter().map(update_to_ui).collect();
+    let updates_ui: Vec<PackageData> = updates
+        .iter()
+        .map(|u| update_to_ui(u, &desktop_map))
+        .collect();
 
     let flatpak_ui: Vec<PackageData> = flatpak_packages
         .iter()
         .map(|p| {
             let has_update = flatpak_update_names.contains(&p.name);
             // Try case-insensitive lookup
-            let (display_name, summary) = flatpak_name_map
+            let (raw_display_name, summary) = flatpak_name_map
                 .get(&p.name.to_lowercase())
                 .cloned()
                 .unwrap_or_else(|| {
@@ -170,12 +173,28 @@ pub async fn load_packages_async(tx: &std::sync::mpsc::Sender<UiMessage>, check_
                         .unwrap_or(&p.name)
                         .replace('_', " ")
                         .replace('-', " ");
-                    (fallback_name, String::new())
+                        
+                    // Title case the fallback name
+                    let titled_name: String = fallback_name
+                        .split_whitespace()
+                        .map(|s| {
+                            let mut c = s.chars();
+                            match c.next() {
+                                None => String::new(),
+                                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                            }
+                        })
+                        .collect::<Vec<String>>()
+                        .join(" ");
+
+                    (titled_name, String::new())
                 });
+
+            let display_name = format!("{} (Flatpak)", raw_display_name);
 
             PackageData {
                 name: SharedString::from(p.name.as_str()),
-                display_name: SharedString::from(&display_name),
+                display_name: SharedString::from(display_name),
                 version: SharedString::from(p.version.to_string().as_str()),
                 description: SharedString::from(&summary),
                 repository: SharedString::from(p.repository.as_str()),
@@ -257,9 +276,11 @@ pub async fn search_packages_async(tx: &std::sync::mpsc::Sender<UiMessage>, quer
         .iter()
         .map(|r| {
             let display_name = humanize_package_name(&r.name, &desktop_map);
+            let display_name = format!("{} (Pacman)", display_name);
+
             PackageData {
                 name: SharedString::from(r.name.as_str()),
-                display_name: SharedString::from(&display_name),
+                display_name: SharedString::from(display_name),
                 version: SharedString::from(r.version.to_string().as_str()),
                 description: SharedString::from(r.description.as_str()),
                 repository: SharedString::from(r.repository.as_str()),
@@ -277,22 +298,46 @@ pub async fn search_packages_async(tx: &std::sync::mpsc::Sender<UiMessage>, quer
         })
         .collect();
 
-    results.extend(flatpak_results.iter().map(|r| PackageData {
-        name: SharedString::from(r.name.as_str()),
-        display_name: SharedString::from(r.name.as_str()),
-        version: SharedString::from(r.version.to_string().as_str()),
-        description: SharedString::from(r.description.as_str()),
-        repository: SharedString::from(r.repository.as_str()),
-        backend: 1,
-        installed: r.installed,
-        has_update: false,
-        installed_size: SharedString::from(""),
-        licenses: SharedString::from(""),
-        url: SharedString::from(""),
-        dependencies: SharedString::from(""),
-        required_by: SharedString::from(""),
-        icon_name: SharedString::from(""),
-        selected: false,
+    results.extend(flatpak_results.iter().map(|r| {
+        let fallback_name = r.name
+            .split('.')
+            .last()
+            .unwrap_or(&r.name)
+            .replace('_', " ")
+            .replace('-', " ");
+            
+        // Title case the fallback name
+        let titled_name: String = fallback_name
+            .split_whitespace()
+            .map(|s| {
+                let mut c = s.chars();
+                match c.next() {
+                    None => String::new(),
+                    Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        let display_name = format!("{} (Flatpak)", titled_name);
+
+        PackageData {
+            name: SharedString::from(r.name.as_str()),
+            display_name: SharedString::from(display_name),
+            version: SharedString::from(r.version.to_string().as_str()),
+            description: SharedString::from(r.description.as_str()),
+            repository: SharedString::from(r.repository.as_str()),
+            backend: 1,
+            installed: r.installed,
+            has_update: false,
+            installed_size: SharedString::from(""),
+            licenses: SharedString::from(""),
+            url: SharedString::from(""),
+            dependencies: SharedString::from(""),
+            required_by: SharedString::from(""),
+            icon_name: SharedString::from(""),
+            selected: false,
+        }
     }));
 
     // Limit results
@@ -1182,9 +1227,11 @@ fn package_to_ui(
     desktop_map: &HashMap<String, String>,
 ) -> PackageData {
     let display_name = humanize_package_name(&package.name, desktop_map);
+    let display_name = format!("{} (Pacman)", display_name);
+
     PackageData {
         name: SharedString::from(package.name.as_str()),
-        display_name: SharedString::from(&display_name),
+        display_name: SharedString::from(display_name),
         version: SharedString::from(package.version.to_string().as_str()),
         description: SharedString::from(package.description.as_str()),
         repository: SharedString::from(package.repository.as_str()),
@@ -1204,10 +1251,13 @@ fn package_to_ui(
     }
 }
 
-fn update_to_ui(update: &UpdateInfo) -> PackageData {
+fn update_to_ui(update: &UpdateInfo, desktop_map: &HashMap<String, String>) -> PackageData {
+    let display_name = humanize_package_name(&update.name, desktop_map);
+    let display_name = format!("{} (Pacman)", display_name);
+
     PackageData {
         name: SharedString::from(update.name.as_str()),
-        display_name: SharedString::from(update.name.as_str()),
+        display_name: SharedString::from(display_name),
         version: SharedString::from(update.new_version.to_string().as_str()),
         description: SharedString::from(format!(
             "{} → {}",
