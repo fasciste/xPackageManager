@@ -1,16 +1,19 @@
 use std::future::Future;
-use std::sync::mpsc;
+use std::sync::{mpsc, OnceLock};
 use std::thread;
 
 use super::types::UiMessage;
 
 use super::data::{load_packages_async, load_repo_packages, search_packages_async};
 
+static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+
+fn get_runtime() -> &'static tokio::runtime::Runtime {
+    RUNTIME.get_or_init(|| tokio::runtime::Runtime::new().expect("Failed to create shared runtime"))
+}
+
 pub fn run_async(task: impl Future<Output = ()> + Send + 'static) {
-    thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-        rt.block_on(task);
-    });
+    get_runtime().spawn(task);
 }
 
 pub fn refresh_after_operation(
